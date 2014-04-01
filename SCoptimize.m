@@ -1,0 +1,598 @@
+function [ OldArmyValue, OldBuildOrder, OldSupplyCount, OldTime, OldTime2, OldArmyValueAtTime ] = SCoptimize(timelength, iterations)
+
+
+%It works
+
+
+%Initializes the output data vectors and values
+OldArmyValue = 0;         %Army Value
+OldBuildOrder = [];       %Build Order Vector containing the names of the built units
+OldSupplyCount = [];      %The "time" when the unit was created
+OldTime = [];                %The TIME when the unit was created
+OldTime2 = [];               %The TIME when the unit was done being built
+OldArmyValueAtTime = [];       %Army value at times
+
+%Play the game as many times as requested
+for H = 1:iterations
+
+    
+%1 Struct
+one.name =             'one';
+one.num =              1;
+one.mincost =          0;
+one.gascost =          0;
+one.supplycost =       0;
+one.buildrequirement = 0;
+one.buildtime =        0;
+one.completiontimes = [];
+one.que =              0;
+one.upgrade =          [];
+
+%0 Struct
+zero.name =             'zero';
+zero.num =              0;
+zero.mincost =          0;
+zero.gascost =          0;
+zero.supplycost =       0;
+zero.buildrequirement = 0;
+zero.buildtime =        0;
+zero.completiontimes =  [];
+zero.que =              0;
+zero.upgrade =          [];
+    
+%initial conditions for buildings
+CommandCenter.name =             'CommandCenter';
+CommandCenter.num =              1;
+CommandCenter.mincost =          400;
+CommandCenter.gascost =          0;
+CommandCenter.supplycost =       0;
+CommandCenter.buildrequirement = one;            %indicates that a Command Center(or another building) has no build requirements
+CommandCenter.buildtime =        100*1.4;
+CommandCenter.completiontimes =  [];
+CommandCenter.que =              0;
+CommandCenter.upgrade =          [];             %Upgrade field, seperate for each entity.  Vector Cells refer to seperate buildings
+                                                 %CommandCenter: 1 = Orbital                                                                                                                     
+
+SupplyDepot.name =              'SupplyDepot';
+SupplyDepot.num =               0;             
+SupplyDepot.mincost =           100;
+SupplyDepot.gascost =           0;
+SupplyDepot.supplycost =        0;
+SupplyDepot.buildrequirement =  one;
+SupplyDepot.buildtime =         30*1.4;
+SupplyDepot.completiontimes =   [];
+SupplyDepot.que =               0;
+SupplyDepot.upgrade =           [];              %Would be added supply upgrade
+
+Refinery.name =             'Refinery';
+Refinery.num =              0;
+Refinery.mincost =          75;
+Refinery.gascost =          0;
+Refinery.supplycost =       0;
+Refinery.buildrequirement =  one;
+Refinery.buildtime =        30 * 1.4;
+Refinery.completiontimes =  []; 
+Refinery.que =              0;
+Refinery.upgrade =          [];                  %No Refinery upgrade
+
+Barracks.name =              'Barracks';
+Barracks.num =               0;
+Barracks.mincost =           150;
+Barracks.gascost =           0;
+Barracks.supplycost =        0;
+Barracks.buildrequirement = SupplyDepot;
+Barracks.buildtime =         65 * 1.4;
+Barracks.completiontimes =   [];
+Barracks.que =               0;
+Barracks.upgrade =           [];                   %1 == reactor, 2 == tech lab
+
+OrbitalCommandCenter.name =             'OrbitalCommandCenter';
+OrbitalCommandCenter.num =              0;
+OrbitalCommandCenter.mincost =          150;
+OrbitalCommandCenter.gascost =          0;
+OrbitalCommandCenter.supplycost =       0;
+OrbitalCommandCenter.buildrequirement = Barracks;            %indicates that a Command Center(or another building) has no build requirements
+OrbitalCommandCenter.buildtime =        35;                            %don't be stupid.
+OrbitalCommandCenter.completiontimes =  [];
+OrbitalCommandCenter.que =              0;
+OrbitalCommandCenter.upgrade =          [];             %Upgrade field, seperate for each entity.  Vector Cells refer to seperate buildings
+                                                 %CommandCenter: 1 =
+                                                 %Orbital       
+
+%initial conditions for units
+minSCV.name =             'minSCV';
+minSCV.num =              6;
+minSCV.mincost =          50;
+minSCV.gascost =          0;
+minSCV.supplycost =       1;    
+minSCV.buildrequirement = CommandCenter;  %As long as command center exists, SCV's can be built
+minSCV.buildtime =        17*1.4;               %17 time units multiplied by the conversion rate to seconds for "quick matches"
+minSCV.completiontimes =  [];
+minSCV.que =              0;
+minSCV.upgrade =          [];             %No scv upgrades
+
+gasSCV.name =             'gasSCV';
+gasSCV.num =              0;
+gasSCV.mincost =          50;
+gasSCV.gascost =          0;
+gasSCV.supplycost =       1;    
+gasSCV.buildrequirement = CommandCenter;  
+gasSCV.buildtime =        17*1.4;
+gasSCV.completiontimes =  [];
+gasSCV.que =              0;
+gasSCV.upgrade =          [];
+
+Mule.name =               'Mule';
+Mule.num =                0;                
+Mule.mincost =            50;               %This is energy cost - 50 for mules
+Mule.gascost =            0;
+Mule.supplycost =         0;
+Mule.buildrequirement =   CommandCenter;    %Upgraded to Orbital
+Mule.buildtime =          0;
+Mule.completiontimes =   [];
+Mule.que =                0;
+Mule.upgrade =           [];
+
+Marine.name =             'Marine';
+Marine.num =              0;
+Marine.mincost =          50;
+Marine.gascost =          0;
+Marine.supplycost =       1;
+Marine.buildrequirement = Barracks;
+Marine.buildtime =        25*1.4;     
+Marine.completiontimes =  [];
+Marine.que =              0;
+Marine.upgrade =          0;            %1 could be stimpack etc.
+
+Marauder.name =             'Marauder';
+Marauder.num =              0;
+Marauder.mincost =          100;
+Marauder.gascost =          25;
+Marauder.supplycost  =      2;
+Marauder.buildrequirement = zero;%Tech Lab
+Marauder.buildtime =        30*1.4;
+Marauder.completiontimes =  [];
+Marauder.que =              0;
+Marauder.upgrade =          [];
+
+Reaper.name =             'Reaper';
+Reaper.num =              0;
+Reaper.mincost =          50;
+Reaper.gascost =          50;
+Reaper.supplycost =       1;
+Reaper.buildrequirement = zero;%[BarracksWithTechLab];
+Reaper.buildtime =        45 * 1.4;
+Reaper.completiontimes =  [];
+Reaper.que =              0;
+Reaper.upgrade =          [];
+
+
+
+%Do Nothing Struct
+DoNothing.name =             'DoNothing';
+DoNothing.num =              0;
+DoNothing.mincost =          0;
+DoNothing.gascost =          0;
+DoNothing.supplycost =       0;
+DoNothing.buildrequirement = 0;
+DoNothing.buildtime =        0;
+DoNothing.completiontimes =  [];
+DoNothing.que =              0;
+DoNothing.upgrade =          [];
+
+
+
+%Other Initial Conditions
+SupplyCap = 10;
+CurrentSupply = 6;          %Supply cost of the six SCV's
+Rmin = 50;
+Rgas = 0;
+Ren =  0;   %Introduction of energy - only for Orbital Command Use for Mules so far Initially has 50 - max 200
+
+
+
+
+buildings = {CommandCenter, SupplyDepot, Barracks};  %vector of the buildings used to find completion times - Refinery is exception
+units = {minSCV, Marine, Marauder, Reaper};  %vector of all of the units
+possibility = {CommandCenter, OrbitalCommandCenter, SupplyDepot, Refinery, minSCV, Barracks, Marine, Marauder, Reaper};       %vector of all of the buildings and units
+
+
+
+    
+    
+    NewArmyValue = 0;       %Resets the new data sets for use 
+    NewBuildOrder = [];
+    NewSupplyCount = [];
+    NewTime = [];
+    NewTime2 = [];
+    NewArmyValueAtTime = [];
+    
+    
+
+
+
+    %A time scale from 0 to the input time length
+    t = 0;
+
+    while (t <= timelength)
+           
+             
+        %calculate the number of minerals available
+        [Rmin Rgas Ren] = determineResources(Rmin, Rgas, Ren, minSCV.num, gasSCV.num, Mule.num, CommandCenter.num, OrbitalCommandCenter.num);
+   
+        
+        %Determines if a building has finished building and adds the building
+        %count, and returns the scv to collecting minerals
+
+        for j = 1:length(buildings)
+            for h = 1:length(buildings{j}.completiontimes)
+                if (t == buildings{j}.completiontimes(h))
+                    buildings{j}.num = buildings{j}.num + 1;
+                    minSCV.num = minSCV.num + 1;
+                end
+            end
+        end
+        
+        units{1} = minSCV;
+        
+        %Update buildings
+        CommandCenter = buildings{1};
+        SupplyDepot = buildings{2};
+        Barracks = buildings{3};
+        
+        %Update BuildRequirements
+        Barracks.buildrequirement = SupplyDepot;
+        OrbitalCommandCenter.buildrequirement = Barracks;
+        Marine.buildrequirement = Barracks;
+   
+        
+        SupplyCap = (SupplyDepot.num * 10) + 10;         %Update the supply cap
+   
+   
+        %Determines if a unit has finished being created and updates the number
+        %of units and the ARMY VALUE!!!!!!!!!!!
+        for d = 1:length(units)
+          for k = 1:length(units{d}.completiontimes)
+            if (t == units{d}.completiontimes(k))
+               units{d}.num = units{d}.num + 1;
+               units{d}.buildrequirement.que = units{d}.buildrequirement.que - 1;  %reduces the queue of the building if a unit has been completed
+              
+               
+               %Updates Time2
+               NewTime2(end+1) = t;
+               
+               
+               
+               %If the unit is an scv, the army value is a modified value
+               %of 0 rather than 50 which is equivalent to a marine
+               if(strcmp(units{d}.name, minSCV.name))
+                   NewArmyValue = NewArmyValue + 0;
+               else    
+                   NewArmyValue = NewArmyValue + (units{d}.mincost + units{d}.gascost);
+               end
+               
+               %Updates ArmyValueAtTime
+               NewArmyValueAtTime(end+1) = NewArmyValue;
+               
+            end
+          end
+        end
+        
+        
+        
+        
+        %Update the units
+        minSCV =   units{1};
+        Marine =   units{2};
+        Marauder = units{3};
+        Reaper =   units{4};
+        
+        minSCV.buildrequirement = units{1}.buildrequirement;
+        Marine.buildrequirement = units{2}.buildrequirement;
+        Marauder.buildrequirement = units{3}.buildrequirement;
+        Reaper.buildrequirement = units{4}.buildrequirement;
+        
+        %{
+        %!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        %!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        %Update the que
+        %minSCV.buildrequirement.que = units{1}.buildrequirement.que;
+        %Marine.buildrequirement.que = units{2}.buildrequirement.que;
+        %Marauder.buildrequirement.que = units{3}.buildrequirement.que;
+        %Reaper.buildrequirement.que = units{4}.buildrequirement.que;
+        %}
+   
+   
+        %Finds if a Refinery is done building and makes the corresponding SCV
+        %begin collecting gas
+       for b = 1:length(Refinery.completiontimes)       
+            if (t == Refinery.completiontimes(b))
+                gasSCV.num = gasSCV.num + 1;  %takes the constructing scv and makes him begin gas collecting if the refinery is finished
+                Refinery.num = Refinery.num + 1;     %Increases the number of total refinery's if the building is finished
+            end
+       end
+   
+       
+       
+       for l = 1:length(OrbitalCommandCenter.completiontimes)
+           if (t == OrbitalCommandCenter.completiontimes(l))
+               OrbitalCommandCenter.num = OrbitalCommandCenter.num+1;
+               Ren = Ren + 50;
+           end
+       end
+       
+       
+       %Reduces the number of mules if a mule has run out of "use time"
+       for x = 1:length(Mule.completiontimes)
+           if (t == Mule.completiontimes(x))
+               Mule.num = Mule.num - 1;
+           end
+       end
+       
+       
+       %Determines if we switch a mineral scv to gas based on probability
+       [minSCV.num gasSCV.num] = SCVchange(Refinery.num, minSCV.num, gasSCV.num);
+
+       
+       
+        %If you have enough money, gas, and if the build requirements for a
+         %building or unit exist, then allow it to be a choice to be produced
+   
+        if (10 .* length(SupplyDepot.completiontimes) + 10 <= CurrentSupply && Rmin >= SupplyDepot.mincost && Rgas >= SupplyDepot.gascost ) %If supply max is reached, build a supply depot once you have the money
+            buildchoice = SupplyDepot;
+       
+        elseif (10 .* length(SupplyDepot.completiontimes) + 10 <= CurrentSupply && Rmin < SupplyDepot.mincost || Rgas < SupplyDepot.gascost )
+            buildchoice = DoNothing;
+                
+                
+                
+        else
+   
+            
+            
+            %updates these vectors if their "values" have changed
+            buildings = {CommandCenter, SupplyDepot, Barracks};                                                                           %vector of the buildings used to find completion times - Refinery is exception
+            units = {minSCV, Marine, Marauder, Reaper};                                                                                   %vector of all of the units
+            possibility = {CommandCenter, OrbitalCommandCenter, SupplyDepot, Refinery, minSCV, Barracks, Marine, Marauder, Reaper};       %vector of all of the buildings and units
+
+            
+            %Remove Refinery from the possibility vector if there are 2 per
+            %command center
+            if(length(Refinery.completiontimes) >= 2*(1 + length(CommandCenter.completiontimes)))
+                for R = 1:length(possibility)
+                    if(strcmp(possibility{R}.name, Refinery.name))
+                        index = R;
+                    end
+                end
+                possibility(index) = [];
+            end
+            
+              
+            
+            %If all of the command centers are upgraded to orbital command
+            %centers, then orbital commandcenter cannot be a choice
+            if CommandCenter.num - sum(CommandCenter.upgrade) <= 0
+               for Y = 1:length(possibility)
+                    if(strcmp(possibility{Y}.name, OrbitalCommandCenter.name))
+                        index = Y;
+                    end
+                end
+                possibility(index) = [];
+            end
+           
+            
+            count = 1;
+            choice = [];
+            for  u = 1:length(possibility)
+               %Scan through each option
+               %BuildingIsTraining is a function that determines if the
+               %building that produces the unit in question is already
+               %making a unit
+                 if (Rmin >= possibility{u}.mincost && Rgas >= possibility{u}.gascost && possibility{u}.buildrequirement.num ~= 0 && possibility{u}.supplycost <= (SupplyCap - CurrentSupply) && BuildingIsTraining(possibility{u}.buildrequirement.num, possibility{u}.buildrequirement.que) == 1)
+                      choice{count} = possibility{u};          %Is A Choice
+                      count = count + 1;          
+                 end
+   
+            end
+   
+            
+  
+            choice{end+1} = DoNothing;        %Add in the possibility that we do nothing fix value
+            
+            W = 0;
+            for R = 1:length(choice)
+                if isequal(choice{R}.name, SupplyDepot.name)
+                    index = R;
+                    W = 0.05;
+                end
+            end
+            
+            % don't need X = 0.8;
+            for Q = 1:length(choice)
+                if isequal(choice{R}.name, DoNothing.name)
+                    index2 = Q;
+                end
+            end
+     
+            %Choice section
+            if W == 0.06             %fix later so it's possible
+                blahvector(1:length(choice)) = 0.09/(length(choice)-2);
+                blahvector(index) = 0.01;
+                blahvector(index2) = 0.9;
+            else
+                
+                blahvector(1:length(choice)) = 0.1/(length(choice)-1);
+                blahvector(index2) = 0.9;
+            end
+            
+            prob = rand(1);       %Generates the random number that will be used to make a choice
+            testVector = cumsum(blahvector);
+   
+            for d = 1:length(choice)
+                if prob <= testVector(d)
+                     buildchoice = choice{d};
+                     break
+                end
+            end
+            
+        end
+        
+        
+      %Determine if we can build more than one unit, and build more based on probability
+      %if(buildchoice.supplycost > 0)
+      %    PossibleNum = min[(floor(Rmin / buildchoice.mincost)), (floor(Rgas / buildchoice.gascost))];
+          
+          %Make multiple units possibly based on probability
+       
+      %end
+        
+        
+   
+      
+    
+      %Update Everything-Store the build order-
+  
+        %If the buildchoice is a building, decrease the number of working scv's
+        %by 1
+        
+        if (isequal(buildchoice, DoNothing) == 0 && isequal(buildchoice, Refinery) == 0 && isequal(buildchoice, OrbitalCommandCenter) == 0 && buildchoice.supplycost == 0)
+            for Q = 1:length(buildings)
+                if isequal(buildchoice, buildings{Q})
+                    minSCV.num = minSCV.num - 1;
+                    buildchoice.completiontimes(end+1) = t + ceil(buildchoice.buildtime);
+                    NewSupplyCount(end + 1) = CurrentSupply;
+                    Rmin = Rmin - buildchoice.mincost;
+                    Rgas = Rgas - buildchoice.gascost;
+                    buildings{Q} = buildchoice;
+                end
+            end
+            units{1} = minSCV;
+            
+            %Update the buildings
+            CommandCenter = buildings{1};
+            SupplyDepot = buildings{2};
+            Barracks = buildings{3};
+        
+            %Update the build requirements
+            %Update BuildRequirements
+            Barracks.buildrequirement = SupplyDepot;
+            OrbitalCommandCenter.buildrequirement = Barracks;
+            Marine.buildrequirement = Barracks;
+        end
+  
+  
+        %If the buildchoice is a unit, start building the unit and determine when
+        %the unit will be completed
+        if (isequal(buildchoice, DoNothing) == 0 && buildchoice.supplycost > 0)
+             for P = 1:length(units)
+                 if isequal(buildchoice, units{P})
+                     if buildchoice.buildrequirement.que == 0
+                            buildchoice.completiontimes(end+1) = t + ceil(buildchoice.buildtime);
+                            buildchoice.buildrequirement.que = buildchoice.buildrequirement.que + 1; %Increase the number of unusable buildings
+                            CurrentSupply = CurrentSupply + buildchoice.supplycost;       %Updates the supply count
+                            Rmin = Rmin - buildchoice.mincost;
+                            Rgas = Rgas - buildchoice.gascost;
+                            units{P} = buildchoice;
+                            NewSupplyCount(end + 1) = CurrentSupply;
+                            NewTime(end + 1) = t;
+                     else
+                            buildchoice.completiontimes(end+1) = buildchoice.completiontimes(end) + ceil(buildchoice.buildtime);
+                            buildchoice.buildrequirement.que = buildchoice.buildrequirement.que + 1; %Increase the number of unusable buildings
+                            CurrentSupply = CurrentSupply + buildchoice.supplycost;       %Updates the supply count
+                            Rmin = Rmin - buildchoice.mincost;
+                            Rgas = Rgas - buildchoice.gascost;
+                            units{P} = buildchoice;
+                            NewSupplyCount(end + 1) = CurrentSupply;
+                            NewTime(end + 1) = t;
+                     end
+                 end
+             end
+             minSCV = units{1};
+             Marine = units{2};
+             Marauder = units{3};
+             Reaper = units{4};
+             minSCV.buildrequirement = units{1}.buildrequirement;
+             Marine.buildrequirement = units{2}.buildrequirement;
+             Marauder.buildrequirement = units{3}.buildrequirement;
+             Reaper.buildrequirement = units{4}.buildrequirement;
+             
+        end
+ 
+        %Find the value of buildchoice and update the que
+        %for J = 1:length(possibility)
+         %   if (possibility{J}.name == buildchoice.name)
+          %      
+          
+          
+        
+
+   
+        if (isequal(buildchoice, Refinery))                     %Subtract an scv that will build the building    
+             minSCV.num = minSCV.num - 1;
+             Refinery.completiontimes(end + 1) = t + ceil(Refinery.buildtime);                             %Increase the element of the vector````
+             Rmin = Rmin-Refinery.mincost;
+             Rgas = Rgas-buildchoice.gascost;
+             NewSupplyCount(end + 1) = CurrentSupply;
+             
+             units{1} = minSCV;
+        end
+  
+        
+        if (isequal(buildchoice, OrbitalCommandCenter))                     
+             OrbitalCommandCenter.completiontimes(end + 1) = t + ceil(OrbitalCommandCenter.buildtime);                             %Increase the element of the vector````
+             CommandCenter.upgrade(end+1)=1;
+             Rmin = Rmin-OrbitalCommandCenter.mincost;
+             Rgas = Rgas-OrbitalCommandCenter.gascost;
+             NewSupplyCount(end + 1) = CurrentSupply;
+        end
+  
+        %Increase the number of mules, and add the the vector containing
+        %their "disappearing times"
+        if Ren >= 50
+            king = floor(Ren/50);
+            Mule.num = Mule.num + king;
+            for i = 1:king
+                Mule.completiontimes(end + 1) = t + ceil(Mule.buildtime);
+            end
+            Ren = Ren - king * 50;
+        end
+        
+        
+        %Storage of the data
+        
+        if(isequal(buildchoice, DoNothing) == 0)   
+            NewBuildOrder{end + 1} = buildchoice.name;
+        end
+        
+        
+        t = t + 1;
+        
+        buildings = {CommandCenter, SupplyDepot, Barracks};                                                                           %vector of the buildings used to find completion times - Refinery is exception
+        units = {minSCV, Marine, Marauder, Reaper};                                                                                   %vector of all of the units
+        possibility = {CommandCenter, OrbitalCommandCenter, SupplyDepot, Refinery, minSCV, Barracks, Marine, Marauder, Reaper};       %vector of all of the buildings and units
+
+        
+        
+    end
+
+
+    %If the new army value is greater than the previous, make it the old build
+    %order - the old stuff will then be the desired output
+    if(NewArmyValue >= OldArmyValue)
+        OldArmyValue = NewArmyValue;
+        OldBuildOrder = NewBuildOrder;
+        OldSupplyCount = NewSupplyCount;
+        OldTime = NewTime;
+        OldTime2 = NewTime2;
+        OldArmyValueAtTime = NewArmyValueAtTime;
+    end
+    
+ 
+end
+
+plot(OldTime2,OldArmyValueAtTime);
+
+end
+
+
+
